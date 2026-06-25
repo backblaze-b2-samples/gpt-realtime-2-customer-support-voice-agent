@@ -9,8 +9,6 @@ completeness. See docs/features/call-bundles.md.
 
 from __future__ import annotations
 
-import base64
-import binascii
 import logging
 import time
 from collections import Counter
@@ -40,16 +38,13 @@ from app.types import (
     DailyCallCount,
     ToolEvent,
     TranscriptTurn,
+    decode_call_audio_base64,
 )
 
 logger = logging.getLogger(__name__)
 
 MAX_PUT_RETRIES = 3
 RETRY_BASE_DELAY = 0.5  # seconds
-
-
-class InvalidCallAudioError(ValueError):
-    """Raised when an end-of-call audio payload is not valid base64."""
 
 
 def _put_with_retry(call_id: str, artifact: str, body: bytes, ct: str) -> None:
@@ -78,19 +73,11 @@ def _summary_line(summary: str) -> str:
     return summary.strip()[:200] or "(no summary)"
 
 
-def _decode_audio_base64(audio_base64: str) -> bytes:
-    if not audio_base64:
-        return b""
-    try:
-        return base64.b64decode(audio_base64, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise InvalidCallAudioError("Invalid audio_base64") from exc
-
-
-def finalize_call(request: CallFinalizeRequest) -> Call:
+def finalize_call(request: CallFinalizeRequest, audio_bytes: bytes | None = None) -> Call:
     """Persist a complete call bundle to B2. Returns the summary Call row."""
     duration = (request.ended_at - request.started_at).total_seconds()
-    audio_bytes = _decode_audio_base64(request.audio_base64)
+    if audio_bytes is None:
+        audio_bytes = decode_call_audio_base64(request.audio_base64)
     tickets_created = sum(1 for t in request.tools if t.tool == "create_ticket" and t.ok)
     deflected = tickets_created == 0 and bool(request.transcript)
 
