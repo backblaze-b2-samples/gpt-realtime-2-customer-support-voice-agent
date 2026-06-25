@@ -1,15 +1,11 @@
 from app.types.calls import (
     Call,
-    CallAudioInvalidError,
-    CallAudioTooLargeError,
-    CallAudioValidationError,
     CallDetail,
     CallFinalizeRequest,
     CallManifest,
     CallStats,
     DailyCallCount,
     TranscriptTurn,
-    decode_call_audio_base64,
 )
 from app.types.files import FileMetadata, FileMetadataDetail
 from app.types.realtime import (
@@ -32,9 +28,6 @@ from app.types.upload import FileUploadResponse
 
 __all__ = [
     "Call",
-    "CallAudioInvalidError",
-    "CallAudioTooLargeError",
-    "CallAudioValidationError",
     "CallDetail",
     "CallFinalizeRequest",
     "CallManifest",
@@ -57,5 +50,4 @@ __all__ = [
     "ToolName",
     "TranscriptTurn",
     "UploadStats",
-    "decode_call_audio_base64",
 ]

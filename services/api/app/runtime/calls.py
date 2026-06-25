@@ -2,7 +2,13 @@ import logging
 import re
 
 from fastapi import APIRouter, HTTPException
+from starlette.responses import JSONResponse
 
+from app.service.call_audio import (
+    CallAudioTooLargeError,
+    CallAudioValidationError,
+    decode_call_audio_base64,
+)
 from app.service.call_orchestrator import (
     audio_url,
     call_volume_activity,
@@ -14,14 +20,12 @@ from app.service.call_orchestrator import (
 )
 from app.types import (
     Call,
-    CallAudioTooLargeError,
-    CallAudioValidationError,
     CallDetail,
     CallFinalizeRequest,
     CallStats,
     DailyCallCount,
-    decode_call_audio_base64,
 )
+from app.types import calls as call_types
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +44,89 @@ def _audio_validation_status(exc: CallAudioValidationError) -> int:
     return 413 if isinstance(exc, CallAudioTooLargeError) else 400
 
 
+class _BodyTooLargeError(Exception):
+    pass
+
+
+class CallFinalizeBodyLimitMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if (
+            scope["type"] != "http"
+            or scope["method"] != "POST"
+            or scope["path"] != "/calls"
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        limit = call_types.max_call_finalize_body_bytes()
+        headers = {
+            key.decode("latin1").lower(): value.decode("latin1")
+            for key, value in scope.get("headers", [])
+        }
+        content_length = headers.get("content-length")
+        try:
+            content_length_too_large = (
+                content_length is not None and int(content_length) > limit
+            )
+        except ValueError:
+            content_length_too_large = False
+        if content_length_too_large:
+            response = JSONResponse(
+                {"detail": call_types.CALL_FINALIZE_BODY_TOO_LARGE_DETAIL},
+                status_code=413,
+            )
+            await response(scope, receive, send)
+            return
+
+        received = 0
+
+        async def limited_receive():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    raise _BodyTooLargeError
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except _BodyTooLargeError:
+            response = JSONResponse(
+                {"detail": call_types.CALL_FINALIZE_BODY_TOO_LARGE_DETAIL},
+                status_code=413,
+            )
+            await response(scope, receive, send)
+
+
 @router.post("/calls", response_model=Call)
 async def finalize_call_endpoint(request: CallFinalizeRequest):
     _validate_call_id(request.call_id)
     try:
         audio_bytes = decode_call_audio_base64(request.audio_base64)
         call = finalize_call(request, audio_bytes=audio_bytes)
+    except CallAudioTooLargeError as exc:
+        logger.warning(
+            "Call audio too large for call_id=%s; preserving bundle without audio: %s",
+            request.call_id,
+            exc.detail,
+        )
+        try:
+            finalize_call(request, audio_bytes=b"")
+        except RuntimeError as persist_exc:
+            logger.error(
+                "Bundle write failed for call_id=%s after audio limit: %s",
+                request.call_id,
+                persist_exc,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to persist call bundle",
+            ) from None
+        raise HTTPException(status_code=413, detail=exc.detail) from None
     except CallAudioValidationError as exc:
         logger.warning(
             "Invalid finalize payload for call_id=%s: %s",

@@ -1,5 +1,3 @@
-import base64
-import binascii
 from datetime import datetime
 from typing import Literal
 
@@ -8,46 +6,26 @@ from pydantic import BaseModel, Field
 from app.types.tools import ToolEvent
 
 MAX_CALL_AUDIO_BYTES = 64 * 1024 * 1024
-CALL_AUDIO_INVALID_DETAIL = "Invalid audio_base64"
+CALL_FINALIZE_BODY_OVERHEAD_BYTES = 40 * 1024 * 1024
+CALL_FINALIZE_BODY_TOO_LARGE_DETAIL = "Call finalize request body too large"
 
 
 def _max_call_audio_base64_chars() -> int:
     return ((MAX_CALL_AUDIO_BYTES + 2) // 3) * 4
 
 
-def _call_audio_too_large_detail() -> str:
-    return f"audio_base64 decoded audio must be <= {MAX_CALL_AUDIO_BYTES} bytes"
+def max_call_audio_base64_chars() -> int:
+    return _max_call_audio_base64_chars()
 
 
-class CallAudioValidationError(ValueError):
-    """Raised when end-of-call audio fails the request contract."""
-
-    def __init__(self, detail: str) -> None:
-        self.detail = detail
-        super().__init__(detail)
+MAX_CALL_AUDIO_BASE64_CHARS = _max_call_audio_base64_chars()
+MAX_CALL_FINALIZE_BODY_BYTES = (
+    MAX_CALL_AUDIO_BASE64_CHARS + CALL_FINALIZE_BODY_OVERHEAD_BYTES
+)
 
 
-class CallAudioInvalidError(CallAudioValidationError):
-    """Raised when audio_base64 is not syntactically valid base64."""
-
-
-class CallAudioTooLargeError(CallAudioValidationError):
-    """Raised when audio_base64 would decode above the configured limit."""
-
-
-def decode_call_audio_base64(audio_base64: str) -> bytes:
-    """Validate and decode POST /calls audio without decoding obvious oversize input."""
-    if not audio_base64:
-        return b""
-    if len(audio_base64) > _max_call_audio_base64_chars():
-        raise CallAudioTooLargeError(_call_audio_too_large_detail())
-    try:
-        audio_bytes = base64.b64decode(audio_base64, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise CallAudioInvalidError(CALL_AUDIO_INVALID_DETAIL) from exc
-    if len(audio_bytes) > MAX_CALL_AUDIO_BYTES:
-        raise CallAudioTooLargeError(_call_audio_too_large_detail())
-    return audio_bytes
+def max_call_finalize_body_bytes() -> int:
+    return MAX_CALL_FINALIZE_BODY_BYTES
 
 
 class TranscriptTurn(BaseModel):
@@ -103,6 +81,7 @@ class CallFinalizeRequest(BaseModel):
     transcript: list[TranscriptTurn] = Field(default_factory=list)
     tools: list[ToolEvent] = Field(default_factory=list)
     audio_base64: str = Field(
+        max_length=MAX_CALL_FINALIZE_BODY_BYTES,
         description=(
             "Base64-encoded WAV audio. Empty string is allowed when capture fails; "
             f"decoded audio is limited to {MAX_CALL_AUDIO_BYTES} bytes."

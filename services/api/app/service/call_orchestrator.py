@@ -29,6 +29,7 @@ from app.repo import (
     list_call_ids,
     put_call_artifact,
 )
+from app.service.call_audio import decode_call_audio_base64
 from app.types import (
     Call,
     CallDetail,
@@ -38,7 +39,6 @@ from app.types import (
     DailyCallCount,
     ToolEvent,
     TranscriptTurn,
-    decode_call_audio_base64,
 )
 
 logger = logging.getLogger(__name__)
