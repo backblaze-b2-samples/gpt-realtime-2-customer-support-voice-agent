@@ -67,3 +67,21 @@ async def test_finalize_validates_call_id(client):
     }
     response = await client.post("/calls", json=bad_body)
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_finalize_rejects_malformed_audio_base64(client):
+    body = {
+        "call_id": "01KSTJVEA7T0QS8YQ694ZKVRSZ",
+        "started_at": "2026-01-01T00:00:00Z",
+        "ended_at": "2026-01-01T00:00:00Z",
+        "transcript": [],
+        "tools": [],
+        "audio_base64": "not-base64!",
+        "model": "gpt-realtime-2",
+    }
+
+    response = await client.post("/calls", json=body)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid audio_base64"

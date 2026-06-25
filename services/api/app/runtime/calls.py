@@ -4,6 +4,7 @@ import re
 from fastapi import APIRouter, HTTPException
 
 from app.service.call_orchestrator import (
+    InvalidCallAudioError,
     audio_url,
     call_volume_activity,
     finalize_call,
@@ -38,6 +39,9 @@ async def finalize_call_endpoint(request: CallFinalizeRequest):
     _validate_call_id(request.call_id)
     try:
         call = finalize_call(request)
+    except InvalidCallAudioError as exc:
+        logger.warning("Invalid finalize payload for call_id=%s: %s", request.call_id, exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from None
     except RuntimeError as exc:
         logger.error("Bundle write failed for call_id=%s: %s", request.call_id, exc)
         raise HTTPException(status_code=502, detail="Failed to persist call bundle") from None
