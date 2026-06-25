@@ -81,11 +81,11 @@ class CallFinalizeRequest(BaseModel):
     transcript: list[TranscriptTurn] = Field(default_factory=list)
     tools: list[ToolEvent] = Field(default_factory=list)
     audio_base64: str = Field(
-        max_length=MAX_CALL_AUDIO_BASE64_CHARS,
         description=(
             "Base64-encoded WAV audio. Empty string is allowed when capture fails; "
             f"decoded audio is limited to {MAX_CALL_AUDIO_BYTES} bytes."
-        )
+        ),
+        json_schema_extra={"maxLength": MAX_CALL_AUDIO_BASE64_CHARS},
     )
     model: str
 
