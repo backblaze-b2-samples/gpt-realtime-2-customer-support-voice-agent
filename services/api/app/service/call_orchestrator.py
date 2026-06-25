@@ -9,7 +9,6 @@ completeness. See docs/features/call-bundles.md.
 
 from __future__ import annotations
 
-import base64
 import logging
 import time
 from collections import Counter
@@ -30,6 +29,7 @@ from app.repo import (
     list_call_ids,
     put_call_artifact,
 )
+from app.service.call_audio import decode_call_audio_base64
 from app.types import (
     Call,
     CallDetail,
@@ -73,10 +73,11 @@ def _summary_line(summary: str) -> str:
     return summary.strip()[:200] or "(no summary)"
 
 
-def finalize_call(request: CallFinalizeRequest) -> Call:
+def finalize_call(request: CallFinalizeRequest, audio_bytes: bytes | None = None) -> Call:
     """Persist a complete call bundle to B2. Returns the summary Call row."""
     duration = (request.ended_at - request.started_at).total_seconds()
-    audio_bytes = base64.b64decode(request.audio_base64) if request.audio_base64 else b""
+    if audio_bytes is None:
+        audio_bytes = decode_call_audio_base64(request.audio_base64)
     tickets_created = sum(1 for t in request.tools if t.tool == "create_ticket" and t.ok)
     deflected = tickets_created == 0 and bool(request.transcript)
 
@@ -258,5 +259,3 @@ def call_volume_activity(days: int = 7) -> list[DailyCallCount]:
         )
         for i in range(days)
     ]
-
-

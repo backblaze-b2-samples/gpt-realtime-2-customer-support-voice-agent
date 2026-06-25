@@ -1,9 +1,12 @@
 """Smoke tests for /calls route input validation.
 
 These tests don't touch B2 — they verify only the runtime-level
-guards (call_id format, limit range, days range). End-to-end bundle
-write tests are tracked in docs/exec-plans/tech-debt-tracker.md.
+guards (call_id format, limit range, days range, finalize audio
+validation). End-to-end bundle write tests are tracked in
+docs/exec-plans/tech-debt-tracker.md.
 """
+
+import base64
 
 import pytest
 
@@ -67,3 +70,114 @@ async def test_finalize_validates_call_id(client):
     }
     response = await client.post("/calls", json=bad_body)
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_finalize_rejects_malformed_audio_base64(client, monkeypatch):
+    def fail_finalize(*_args, **_kwargs):
+        pytest.fail("finalize_call should not run for invalid audio")
+
+    monkeypatch.setattr("app.runtime.calls.finalize_call", fail_finalize)
+    body = {
+        "call_id": "01KSTJVEA7T0QS8YQ694ZKVRSZ",
+        "started_at": "2026-01-01T00:00:00Z",
+        "ended_at": "2026-01-01T00:00:00Z",
+        "transcript": [],
+        "tools": [],
+        "audio_base64": "not-base64!",
+        "model": "gpt-realtime-2",
+    }
+
+    response = await client.post("/calls", json=body)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid audio_base64"
+
+
+@pytest.mark.asyncio
+async def test_finalize_rejects_oversized_malformed_audio_base64(client, monkeypatch):
+    import app.types.calls as call_types
+
+    def fail_finalize(*_args, **_kwargs):
+        pytest.fail("finalize_call should not run for invalid audio")
+
+    monkeypatch.setattr(call_types, "MAX_CALL_AUDIO_BYTES", 3)
+    monkeypatch.setattr("app.runtime.calls.finalize_call", fail_finalize)
+    body = {
+        "call_id": "01KSTJVEA7T0QS8YQ694ZKVRSZ",
+        "started_at": "2026-01-01T00:00:00Z",
+        "ended_at": "2026-01-01T00:00:00Z",
+        "transcript": [],
+        "tools": [],
+        "audio_base64": "!!!!!!!!",
+        "model": "gpt-realtime-2",
+    }
+
+    response = await client.post("/calls", json=body)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid audio_base64"
+
+
+@pytest.mark.asyncio
+async def test_finalize_preserves_bundle_when_audio_is_oversized(client, monkeypatch):
+    import app.types.calls as call_types
+
+    audio_payloads: list[bytes | None] = []
+
+    def fake_finalize(_request, audio_bytes=None):
+        audio_payloads.append(audio_bytes)
+
+    monkeypatch.setattr(call_types, "MAX_CALL_AUDIO_BYTES", 3)
+    monkeypatch.setattr("app.runtime.calls.finalize_call", fake_finalize)
+    body = {
+        "call_id": "01KSTJVEA7T0QS8YQ694ZKVRSZ",
+        "started_at": "2026-01-01T00:00:00Z",
+        "ended_at": "2026-01-01T00:00:00Z",
+        "transcript": [
+            {
+                "speaker": "caller",
+                "text": "I need help with my order",
+                "started_at": "2026-01-01T00:00:00Z",
+                "ended_at": "2026-01-01T00:00:01Z",
+            }
+        ],
+        "tools": [],
+        "audio_base64": base64.b64encode(b"abcd").decode("ascii"),
+        "model": "gpt-realtime-2",
+    }
+
+    response = await client.post("/calls", json=body)
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "audio_base64 decoded audio must be <= 3 bytes"
+    assert audio_payloads == [b""]
+
+
+@pytest.mark.asyncio
+async def test_finalize_rejects_body_over_limit_before_validation(client, monkeypatch):
+    import app.types.calls as call_types
+
+    def fail_decode(*_args, **_kwargs):
+        pytest.fail("decode_call_audio_base64 should not run for oversized body")
+
+    def fail_finalize(*_args, **_kwargs):
+        pytest.fail("finalize_call should not run for oversized body")
+
+    monkeypatch.setattr(call_types, "MAX_CALL_FINALIZE_BODY_BYTES", 64)
+    monkeypatch.setattr("app.runtime.calls.decode_call_audio_base64", fail_decode)
+    monkeypatch.setattr("app.runtime.calls.finalize_call", fail_finalize)
+    body = {
+        "call_id": "01KSTJVEA7T0QS8YQ694ZKVRSZ",
+        "started_at": "2026-01-01T00:00:00Z",
+        "ended_at": "2026-01-01T00:00:00Z",
+        "transcript": [],
+        "tools": [],
+        "audio_base64": base64.b64encode(b"abcd").decode("ascii"),
+        "model": "gpt-realtime-2",
+    }
+
+    response = await client.post("/calls", json=body)
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Call finalize request body too large"

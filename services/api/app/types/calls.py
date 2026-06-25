@@ -5,6 +5,28 @@ from pydantic import BaseModel, Field
 
 from app.types.tools import ToolEvent
 
+MAX_CALL_AUDIO_BYTES = 64 * 1024 * 1024
+CALL_FINALIZE_BODY_OVERHEAD_BYTES = 40 * 1024 * 1024
+CALL_FINALIZE_BODY_TOO_LARGE_DETAIL = "Call finalize request body too large"
+
+
+def _max_call_audio_base64_chars() -> int:
+    return ((MAX_CALL_AUDIO_BYTES + 2) // 3) * 4
+
+
+def max_call_audio_base64_chars() -> int:
+    return _max_call_audio_base64_chars()
+
+
+MAX_CALL_AUDIO_BASE64_CHARS = _max_call_audio_base64_chars()
+MAX_CALL_FINALIZE_BODY_BYTES = (
+    MAX_CALL_AUDIO_BASE64_CHARS + CALL_FINALIZE_BODY_OVERHEAD_BYTES
+)
+
+
+def max_call_finalize_body_bytes() -> int:
+    return MAX_CALL_FINALIZE_BODY_BYTES
+
 
 class TranscriptTurn(BaseModel):
     """One conversational turn in `transcript.jsonl`."""
@@ -58,7 +80,13 @@ class CallFinalizeRequest(BaseModel):
     ended_at: datetime
     transcript: list[TranscriptTurn] = Field(default_factory=list)
     tools: list[ToolEvent] = Field(default_factory=list)
-    audio_base64: str
+    audio_base64: str = Field(
+        description=(
+            "Base64-encoded WAV audio. Empty string is allowed when capture fails; "
+            f"decoded audio is limited to {MAX_CALL_AUDIO_BYTES} bytes."
+        ),
+        json_schema_extra={"maxLength": MAX_CALL_AUDIO_BASE64_CHARS},
+    )
     model: str
 
 

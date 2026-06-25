@@ -46,6 +46,7 @@ The 24 kHz sample rate matches what the OpenAI Realtime API streams on the model
   - `transcript`: array of `TranscriptTurn`
   - `tools`: array of `ToolEvent`
   - `audio_base64`: base64-encoded 24 kHz 16-bit mono WAV with both sides of the conversation mixed (see `apps/web/src/lib/audio-recorder.ts`). Empty string when capture failed — the orchestrator still writes the rest of the bundle.
+  - Decoded audio is capped at 64 MiB (`MAX_CALL_AUDIO_BYTES` in `services/api/app/types/calls.py`). The encoded request body is capped separately so grossly oversized finalize requests fail before JSON validation or audio decoding.
 
 ## Outputs
 - `POST /calls` → `Call` (`{ call_id, started_at, ended_at, duration_seconds, tool_count, deflected, summary_line, complete }`, per the Pydantic model in `services/api/app/types/calls.py`)
@@ -84,7 +85,10 @@ The orchestrator writes in this exact order:
 ## Edge Cases
 - `PutObject` fails repeatedly → bundle left partial, ERROR logged with `call_id` and key; explorer surfaces as "incomplete"
 - Summary generation fails → `summary.md` written with an error notice, but `manifest.json` is still written
-- `audio_base64` empty / corrupt → 400 from runtime, no objects written
+- `audio_base64` empty → bundle persists with an empty `audio.wav`
+- `audio_base64` corrupt → 400 from runtime, no objects written
+- request body over the finalize size limit → 413 from runtime, no objects written
+- `audio_base64` over the decoded size limit → 413 from runtime after preserving transcript, tools, summary, and manifest with an empty `audio.wav`
 - Same `call_id` POSTed twice → second POST overwrites; final state is whichever request finished last (idempotent for our purposes)
 - Bucket missing → 502, no objects written; user is asked to fix config
 

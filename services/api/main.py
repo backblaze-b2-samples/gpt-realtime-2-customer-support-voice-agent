@@ -133,6 +133,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+app.add_middleware(calls.CallFinalizeBodyLimitMiddleware)
 
 # Request ID + timing middleware
 app.add_middleware(BaseHTTPMiddleware, dispatch=metrics.timing_middleware)
