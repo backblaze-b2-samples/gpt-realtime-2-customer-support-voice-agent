@@ -61,7 +61,7 @@ The starter kit gives us essentially everything **except** the realtime audio lo
 
 **Custom user agent (standard #2):** `boto3` `Config` `user_agent_extra="b2ai-gpt-realtime-2-customer-support-voice-agent (backblaze-b2-samples)"` set in `b2_client.py::get_s3_client()`.
 
-**Env vars (standard #3):** `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_REGION`, and optional `B2_PUBLIC_URL_BASE`. The S3 endpoint is derived from `B2_REGION`; the doctor script and `settings.py` will be updated together.
+**Env vars (standard #3):** `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_REGION`, and optional `B2_PUBLIC_URL_BASE`. The S3 endpoint is derived from validated `B2_REGION`; legacy `B2_ENDPOINT` is accepted only as a temporary rolling-deploy fallback.
 
 No native B2 API usage. If any future feature wants the native B2 API (e.g. file locks, application-key creation), it must be justified per parent CLAUDE.md.
 
@@ -160,6 +160,8 @@ B2_APPLICATION_KEY=
 B2_BUCKET_NAME=
 B2_REGION=
 B2_PUBLIC_URL_BASE=
+# Temporary migration fallback only:
+# B2_ENDPOINT=https://s3.<region>.backblazeb2.com
 
 # OpenAI (required)
 OPENAI_API_KEY=

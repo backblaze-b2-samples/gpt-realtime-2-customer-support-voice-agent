@@ -1,5 +1,6 @@
 import functools
 import io
+import logging
 import mimetypes
 from datetime import UTC, datetime
 from urllib.parse import quote
@@ -11,6 +12,8 @@ from botocore.exceptions import ClientError
 from app.config import settings
 from app.types import FileMetadata
 from app.types.formatting import humanize_bytes
+
+logger = logging.getLogger(__name__)
 
 
 def _guess_content_type(key: str) -> str:
@@ -35,10 +38,15 @@ def _public_url(key: str) -> str | None:
 
 @functools.lru_cache(maxsize=1)
 def get_s3_client():
+    if settings.uses_legacy_b2_endpoint:
+        logger.warning(
+            "B2_ENDPOINT is deprecated; set B2_REGION to derive the "
+            "Backblaze S3 endpoint before removing B2_ENDPOINT"
+        )
     return boto3.client(
         "s3",
         endpoint_url=settings.b2_endpoint_url,
-        region_name=settings.b2_region or None,
+        region_name=settings.b2_effective_region or None,
         aws_access_key_id=settings.b2_application_key_id,
         aws_secret_access_key=settings.b2_application_key,
         config=Config(
@@ -49,6 +57,10 @@ def get_s3_client():
             ),
         ),
     )
+
+
+def clear_s3_client_cache() -> None:
+    get_s3_client.cache_clear()
 
 
 def check_connectivity() -> bool:

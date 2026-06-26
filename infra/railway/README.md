@@ -29,6 +29,7 @@ Set these on the API service:
 | `B2_BUCKET_NAME` | Your bucket name |
 | `B2_REGION` | Your B2 bucket region |
 | `B2_PUBLIC_URL_BASE` | Optional public bucket URL prefix |
+| `B2_ENDPOINT` | Temporary legacy fallback; keep alongside `B2_REGION` for one rollout if already set, then remove |
 | `OPENAI_API_KEY` | Your OpenAI API key (used for Realtime + summary) |
 | `OPENAI_REALTIME_MODEL` | Optional override (default `gpt-realtime-2`) |
 | `OPENAI_SUMMARY_MODEL` | Optional override (default `gpt-4.1-mini`) |
@@ -39,3 +40,7 @@ Set this on the Web service:
 | Variable | Value |
 |----------|-------|
 | `NEXT_PUBLIC_API_URL` | Your API service URL (e.g., `https://api-production-xxx.up.railway.app`) |
+
+During the B2 region migration, deploy in two steps: first set `B2_REGION`
+without deleting an existing `B2_ENDPOINT`, then remove `B2_ENDPOINT` only
+after all API replicas have restarted on the new build.

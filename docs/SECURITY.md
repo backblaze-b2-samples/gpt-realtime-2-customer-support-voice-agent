@@ -6,7 +6,7 @@ Security principles and implementation for the gpt-realtime-2-customer-support-v
 ## Trust Boundaries
 
 - **Frontend -> API**: CORS-restricted to configured origins, scoped to `GET/POST/DELETE/OPTIONS`
-- **API -> B2**: Authenticated via `B2_APPLICATION_KEY_ID` + `B2_APPLICATION_KEY`, signature v4, S3 endpoint derived from `B2_REGION`
+- **API -> B2**: Authenticated via `B2_APPLICATION_KEY_ID` + `B2_APPLICATION_KEY`, signature v4. The S3 endpoint is derived from validated `B2_REGION`; `B2_ENDPOINT` is accepted only as a temporary rolling-deploy fallback.
 - **API -> OpenAI**: Authenticated via `OPENAI_API_KEY`. The key never leaves the API process.
 - **Client -> OpenAI Realtime**: Direct WebRTC peer connection authenticated by an **ephemeral session token** minted by the API (`POST /realtime/session`). The token is short-lived (≤ 1 minute by default) and scoped to a single Realtime session. The API never proxies audio bytes.
 - **Client -> B2**: Presigned URLs for audio playback (10-min expiry, `Content-Disposition: inline`)

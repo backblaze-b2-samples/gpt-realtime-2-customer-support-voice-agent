@@ -83,6 +83,11 @@ Then in `.env`:
   - `B2_PUBLIC_URL_BASE` — optional friendly public bucket URL prefix
 - **OpenAI** — paste your API key into `OPENAI_API_KEY`. Optionally override `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2`) and `OPENAI_SUMMARY_MODEL` (default `gpt-4.1-mini`).
 
+Migration note: if an existing deployment still has `B2_ENDPOINT`, add
+`B2_REGION` and keep both values through one rollout. New code derives the
+S3 endpoint from `B2_REGION`; older replicas may still need `B2_ENDPOINT`.
+Remove `B2_ENDPOINT` after every API replica is on the region-aware build.
+
 > Walkthroughs: [create a bucket](https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent) · [create app keys](https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent).
 
 ### 4. Run it

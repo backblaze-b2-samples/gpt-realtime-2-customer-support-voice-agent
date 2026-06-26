@@ -31,20 +31,22 @@ const REQUIRED_B2_VARS = [
   "B2_APPLICATION_KEY_ID",
   "B2_APPLICATION_KEY",
   "B2_BUCKET_NAME",
-  "B2_REGION",
 ];
+const B2_REGION_VAR = "B2_REGION";
+const LEGACY_B2_ENDPOINT_VAR = "B2_ENDPOINT";
 const REQUIRED_OPENAI_VARS = ["OPENAI_API_KEY"];
 const REQUIRED_VARS = [...REQUIRED_B2_VARS, ...REQUIRED_OPENAI_VARS];
+const B2_REGION_PATTERN = /^[a-z]{2}(?:-[a-z]+)+-[0-9]{3}$/;
+const B2_ENDPOINT_PATTERN = /^https:\/\/s3\.([a-z]{2}(?:-[a-z]+)+-[0-9]{3})\.backblazeb2\.com\/?$/;
 const PLACEHOLDERS = new Set([
   "your_application_key_id",
   "your_application_key",
   "your-bucket-name",
   "your-b2-region",
+  "your-b2-endpoint",
   "your_openai_api_key",
 ]);
-const LEGACY_B2_VARS = ["ENDPOINT", "PUBLIC_URL", "KEY_ID"].map(
-  (suffix) => `B2_${suffix}`,
-);
+const RETIRED_B2_VARS = ["B2_PUBLIC_URL", "B2_KEY_ID"];
 
 // Only Next.js: `pnpm dev` self-heals the API side via scripts/pick-port.mjs,
 // so warning about 8000 here would just duplicate dev.sh's own banner.
@@ -178,13 +180,16 @@ function checkEnv() {
   }
   const env = parseEnvFile(ENV_FILE);
   const missing = REQUIRED_VARS.filter((k) => !env[k]);
+  if (!env[B2_REGION_VAR] && !env[LEGACY_B2_ENDPOINT_VAR]) {
+    missing.push(`${B2_REGION_VAR} (or legacy ${LEGACY_B2_ENDPOINT_VAR})`);
+  }
   if (missing.length > 0) {
     fail(
       `.env is missing required variables: ${missing.join(", ")}`,
       "See .env.example for the full list and edit .env to add them",
     );
   }
-  const placeholders = REQUIRED_VARS.filter(
+  const placeholders = [...REQUIRED_VARS, B2_REGION_VAR, LEGACY_B2_ENDPOINT_VAR].filter(
     (k) => env[k] && PLACEHOLDERS.has(env[k]),
   );
   if (placeholders.length > 0) {
@@ -193,12 +198,33 @@ function checkEnv() {
       "Edit .env and replace placeholders with your real B2 credentials (https://secure.backblaze.com/app_keys.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent) and your OpenAI API key (https://platform.openai.com/api-keys)",
     );
   }
-  const legacy = LEGACY_B2_VARS.filter((k) =>
+  if (env[B2_REGION_VAR] && !B2_REGION_PATTERN.test(env[B2_REGION_VAR])) {
+    fail(
+      `${B2_REGION_VAR} must be a Backblaze region slug like <country>-<region>-<number>`,
+      `Use the bucket region from the B2 dashboard, or temporarily keep ${LEGACY_B2_ENDPOINT_VAR} during migration`,
+    );
+  }
+  if (
+    env[LEGACY_B2_ENDPOINT_VAR] &&
+    !B2_ENDPOINT_PATTERN.test(env[LEGACY_B2_ENDPOINT_VAR])
+  ) {
+    fail(
+      `${LEGACY_B2_ENDPOINT_VAR} must be a Backblaze S3 endpoint like https://s3.<region>.backblazeb2.com`,
+      `Prefer ${B2_REGION_VAR}; keep ${LEGACY_B2_ENDPOINT_VAR} only during a rolling migration`,
+    );
+  }
+  if (env[LEGACY_B2_ENDPOINT_VAR]) {
+    warn(
+      `${LEGACY_B2_ENDPOINT_VAR} is deprecated`,
+      `Set ${B2_REGION_VAR} and keep both values through one rollout before removing ${LEGACY_B2_ENDPOINT_VAR}`,
+    );
+  }
+  const retired = RETIRED_B2_VARS.filter((k) =>
     Object.prototype.hasOwnProperty.call(env, k),
   );
-  if (legacy.length > 0) {
+  if (retired.length > 0) {
     fail(
-      `.env uses retired B2 variables: ${legacy.join(", ")}`,
+      `.env uses retired B2 variables: ${retired.join(", ")}`,
       "Use B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_NAME, B2_REGION, and optional B2_PUBLIC_URL_BASE",
     );
   }
