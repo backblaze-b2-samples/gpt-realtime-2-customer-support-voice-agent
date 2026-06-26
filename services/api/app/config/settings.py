@@ -14,12 +14,11 @@ class Settings(BaseSettings):
     # Backblaze B2 — canonical names per parent CLAUDE.md.
     # All defaults are intentionally empty: the user supplies real
     # values via .env (see .env.example for the example region/endpoint).
-    b2_endpoint: str = ""
     b2_application_key_id: str = ""
     b2_application_key: str = ""
     b2_bucket_name: str = ""
     b2_region: str = ""
-    b2_public_url: str = ""
+    b2_public_url_base: str = ""
 
     # OpenAI
     openai_api_key: str = ""
@@ -48,7 +47,14 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": (str(_REPO_ROOT / ".env"), ".env"),
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
+
+    @property
+    def b2_endpoint_url(self) -> str:
+        if not self.b2_region:
+            return ""
+        return f"https://s3.{self.b2_region}.backblazeb2.com"
 
     @property
     def cors_origins(self) -> list[str]:

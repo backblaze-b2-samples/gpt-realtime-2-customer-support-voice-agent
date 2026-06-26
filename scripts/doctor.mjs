@@ -28,23 +28,23 @@ const REQUIRED_PYTHON_MINOR = 11; // 3.11+
 // .env.example. Keep in sync with services/api/main.py REQUIRED_B2_SETTINGS,
 // REQUIRED_OPENAI_SETTINGS, and PLACEHOLDER_VALUES.
 const REQUIRED_B2_VARS = [
-  "B2_ENDPOINT",
   "B2_APPLICATION_KEY_ID",
   "B2_APPLICATION_KEY",
   "B2_BUCKET_NAME",
+  "B2_REGION",
 ];
 const REQUIRED_OPENAI_VARS = ["OPENAI_API_KEY"];
 const REQUIRED_VARS = [...REQUIRED_B2_VARS, ...REQUIRED_OPENAI_VARS];
-// Note: B2_ENDPOINT ships with a real default value in .env.example
-// (https://s3.us-west-004.backblazeb2.com) so it is intentionally absent
-// from this set. Keep this list in sync with PLACEHOLDER_VALUES in
-// services/api/main.py.
 const PLACEHOLDERS = new Set([
   "your_application_key_id",
   "your_application_key",
   "your-bucket-name",
+  "your-b2-region",
   "your_openai_api_key",
 ]);
+const LEGACY_B2_VARS = ["ENDPOINT", "PUBLIC_URL", "KEY_ID"].map(
+  (suffix) => `B2_${suffix}`,
+);
 
 // Only Next.js: `pnpm dev` self-heals the API side via scripts/pick-port.mjs,
 // so warning about 8000 here would just duplicate dev.sh's own banner.
@@ -191,6 +191,15 @@ function checkEnv() {
     fail(
       `.env still has placeholder values: ${placeholders.join(", ")}`,
       "Edit .env and replace placeholders with your real B2 credentials (https://secure.backblaze.com/app_keys.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent) and your OpenAI API key (https://platform.openai.com/api-keys)",
+    );
+  }
+  const legacy = LEGACY_B2_VARS.filter((k) =>
+    Object.prototype.hasOwnProperty.call(env, k),
+  );
+  if (legacy.length > 0) {
+    fail(
+      `.env uses retired B2 variables: ${legacy.join(", ")}`,
+      "Use B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_NAME, B2_REGION, and optional B2_PUBLIC_URL_BASE",
     );
   }
 }

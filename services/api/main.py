@@ -31,7 +31,7 @@ REQUIRED_B2_SETTINGS = (
     ("b2_application_key_id", "B2_APPLICATION_KEY_ID"),
     ("b2_application_key", "B2_APPLICATION_KEY"),
     ("b2_bucket_name", "B2_BUCKET_NAME"),
-    ("b2_endpoint", "B2_ENDPOINT"),
+    ("b2_region", "B2_REGION"),
 )
 
 REQUIRED_OPENAI_SETTINGS = (("openai_api_key", "OPENAI_API_KEY"),)
@@ -40,15 +40,11 @@ REQUIRED_OPENAI_SETTINGS = (("openai_api_key", "OPENAI_API_KEY"),)
 # the example and didn't edit it, Settings will pass the "non-empty"
 # check above but every external call will still fail. Catch that here.
 #
-# Note: B2_ENDPOINT ships with a real default value in .env.example
-# (https://s3.us-west-004.backblazeb2.com), so it is intentionally not
-# listed here — overwriting it with a region-specific endpoint is
-# expected, but the shipped default itself is valid for the most common
-# B2 region and should not trigger a placeholder failure.
 PLACEHOLDER_VALUES = frozenset({
     "your_application_key_id",
     "your_application_key",
     "your-bucket-name",
+    "your-b2-region",
     "your_openai_api_key",
 })
 

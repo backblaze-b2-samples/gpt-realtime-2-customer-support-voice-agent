@@ -77,10 +77,10 @@ Then in `.env`:
 
 - **Backblaze B2** — create a bucket and application key at the [B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent), then paste:
   - `B2_BUCKET_NAME` — Bucket Unique Name
-  - `B2_ENDPOINT` — S3 endpoint shown on the bucket page
   - `B2_APPLICATION_KEY_ID` — keyID (Read+Write on the bucket)
   - `B2_APPLICATION_KEY` — applicationKey (shown once)
-  - `B2_REGION` — e.g. `us-west-004`
+  - `B2_REGION` — bucket region from the B2 dashboard
+  - `B2_PUBLIC_URL_BASE` — optional friendly public bucket URL prefix
 - **OpenAI** — paste your API key into `OPENAI_API_KEY`. Optionally override `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2`) and `OPENAI_SUMMARY_MODEL` (default `gpt-4.1-mini`).
 
 > Walkthroughs: [create a bucket](https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent) · [create app keys](https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent).
