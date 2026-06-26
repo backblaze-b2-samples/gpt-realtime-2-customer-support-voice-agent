@@ -31,6 +31,9 @@ REQUIRED_B2_SETTINGS = (
     ("b2_application_key_id", "B2_APPLICATION_KEY_ID"),
     ("b2_application_key", "B2_APPLICATION_KEY"),
     ("b2_bucket_name", "B2_BUCKET_NAME"),
+)
+B2_ENDPOINT_SETTINGS = (
+    ("b2_region", "B2_REGION"),
     ("b2_endpoint", "B2_ENDPOINT"),
 )
 
@@ -40,15 +43,12 @@ REQUIRED_OPENAI_SETTINGS = (("openai_api_key", "OPENAI_API_KEY"),)
 # the example and didn't edit it, Settings will pass the "non-empty"
 # check above but every external call will still fail. Catch that here.
 #
-# Note: B2_ENDPOINT ships with a real default value in .env.example
-# (https://s3.us-west-004.backblazeb2.com), so it is intentionally not
-# listed here — overwriting it with a region-specific endpoint is
-# expected, but the shipped default itself is valid for the most common
-# B2 region and should not trigger a placeholder failure.
 PLACEHOLDER_VALUES = frozenset({
     "your_application_key_id",
     "your_application_key",
     "your-bucket-name",
+    "your-b2-region",
+    "your-b2-endpoint",
     "your_openai_api_key",
 })
 
@@ -61,6 +61,8 @@ async def lifespan(_app: "FastAPI"):
         for attr, env_name in all_required
         if not getattr(settings, attr)
     ]
+    if not settings.b2_region and not settings.b2_endpoint:
+        missing.append("B2_REGION (or legacy B2_ENDPOINT during migration)")
     if missing:
         raise RuntimeError(
             "Missing required configuration: "
@@ -70,7 +72,7 @@ async def lifespan(_app: "FastAPI"):
 
     placeholders = [
         env_name
-        for attr, env_name in all_required
+        for attr, env_name in all_required + B2_ENDPOINT_SETTINGS
         if getattr(settings, attr) in PLACEHOLDER_VALUES
     ]
     if placeholders:
@@ -78,6 +80,11 @@ async def lifespan(_app: "FastAPI"):
             "Configuration still has placeholder values: "
             + ", ".join(placeholders)
             + f". Edit {REPO_ROOT_ENV} with your real credentials and restart."
+        )
+    if settings.uses_legacy_b2_endpoint:
+        logger.warning(
+            "B2_ENDPOINT is deprecated; set B2_REGION and keep both values "
+            "through one rollout before removing B2_ENDPOINT"
         )
     yield
 

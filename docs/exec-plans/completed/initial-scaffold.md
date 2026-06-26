@@ -1,6 +1,6 @@
 # gpt-realtime-2-customer-support-voice-agent — Initial Scaffold Plan
 
-> **Source of truth:** `.claude/scratch/vcsk-ca1e4768-ef16-40ec-b5fe-90527aa11527/` (vibe-coding-starter-kit clone). All keep/trim/add deltas are computed against that tree.
+> **Source of truth:** `.claude/scratch/<starter-kit-clone>/` (vibe-coding-starter-kit clone). All keep/trim/add deltas are computed against that tree.
 
 ---
 
@@ -26,7 +26,7 @@ SEO targets: "GPT-Realtime-2 voice agent", "customer support voice AI", "OpenAI 
 | `apps/web/src/components/layout/app-sidebar.tsx` (extend, don't rewrite) | `services/api/app/service/metadata.py` — keep file exists, but trim image/PDF extraction; this sample doesn't need EXIF | `services/api/app/runtime/realtime.py` — POST `/realtime/session` returns ephemeral OpenAI Realtime session token (client opens WebRTC directly to OpenAI; server never proxies audio bytes) |
 | `apps/web/src/lib/api-client.ts`, `lib/queries.ts` patterns (extend with new endpoints) | `services/api/tests/test_structure.py` — keep, just update layer/file list | `services/api/app/runtime/calls.py` — POST `/calls` (finalize bundle), GET `/calls`, GET `/calls/{id}`, GET `/calls/{id}/audio` (presigned), DELETE `/calls/{id}` |
 | `packages/shared/src/types.ts` shape (extend with `Call`, `ToolEvent`, `TranscriptTurn`) | `docs/features/metadata-extraction.md` — **delete**, replaced by `tool-calling.md` | `services/api/app/runtime/tools.py` — POST `/tools/invoke` (server-side tool execution; called via OpenAI Realtime tool-calling) |
-| `services/api/app/repo/b2_client.py` (S3, signature v4, custom user agent) — extend with `put_call_bundle`, `list_calls`, `get_presigned_audio_url` | Default `B2_KEY_ID` env var name — **rename** to `B2_APPLICATION_KEY_ID` per parent CLAUDE.md standard | `services/api/app/repo/openai_client.py` — wraps `openai` SDK calls for **non-realtime** uses (summary generation post-call, transcription fallback if needed). Realtime API stays client↔OpenAI direct |
+| `services/api/app/repo/b2_client.py` (S3, signature v4, custom user agent) — extend with `put_call_bundle`, `list_calls`, `get_presigned_audio_url` | Default key ID env var name — **rename** to `B2_APPLICATION_KEY_ID` per parent CLAUDE.md standard | `services/api/app/repo/openai_client.py` — wraps `openai` SDK calls for **non-realtime** uses (summary generation post-call, transcription fallback if needed). Realtime API stays client↔OpenAI direct |
 | `services/api/app/runtime/health.py`, `metrics.py` | | `services/api/app/repo/helpdesk_adapter.py` — **adapter interface**: `CrmAdapter` Protocol + `MockCrmAdapter` impl with in-memory fixtures (`accounts`, `orders`, `tickets`). Real Zendesk/Intercom impls are an explicit extension point, not in v1 |
 | Layered architecture (`types → config → repo → service → runtime`) — **strict** | | `services/api/app/service/call_orchestrator.py` — assembles bundle from in-flight session state, posts to B2, generates summary |
 | Structural tests (`pnpm check:structure`) — extend coverage to new layers | | `services/api/app/service/tool_executor.py` — dispatches realtime tool calls to `CrmAdapter`, records each to the trace |
@@ -48,7 +48,7 @@ The starter kit gives us essentially everything **except** the realtime audio lo
 
 ## 3. B2 surface (S3 operations exercised)
 
-**S3 API only — no b2-native calls.** Per parent CLAUDE.md standard #1.
+**S3 API only — no native B2 API calls.** Per parent CLAUDE.md standard #1.
 
 | Operation | Where | Purpose |
 |---|---|---|
@@ -59,11 +59,11 @@ The starter kit gives us essentially everything **except** the realtime audio lo
 | `DeleteObject` (loop) | `repo/b2_client.py::delete_call()` | Delete entire `calls/<id>/` prefix |
 | `GeneratePresignedUrl` (`get_object`) | `repo/b2_client.py::get_presigned_audio_url()` | 10-minute presigned URL for audio playback, `response-content-disposition=inline` |
 
-**Custom user agent (standard #2):** `boto3` `Config` `user_agent_extra="gpt-realtime-2-customer-support-voice-agent/0.1.0"` set in `b2_client.py::_make_client()`. The exact UA tag will come from the Tier 1 sub-issue's `user_agent_extra` field if/when this sample gets one; placeholder until then.
+**Custom user agent (standard #2):** `boto3` `Config` `user_agent_extra="b2ai-gpt-realtime-2-customer-support-voice-agent (backblaze-b2-samples)"` set in `b2_client.py::get_s3_client()`.
 
-**Env vars (standard #3):** `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_ENDPOINT` — renamed from starter kit's `B2_KEY_ID`. Optional `B2_REGION` for clients that need it explicit. The doctor script and `settings.py` will be updated together.
+**Env vars (standard #3):** `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_REGION`, and optional `B2_PUBLIC_URL_BASE`. The S3 endpoint is derived from validated `B2_REGION`; legacy `B2_ENDPOINT` is accepted only as a temporary rolling-deploy fallback.
 
-No b2-native API usage. If any future feature wants b2-native (e.g. file locks, application-key creation), it must be justified per parent CLAUDE.md.
+No native B2 API usage. If any future feature wants the native B2 API (e.g. file locks, application-key creation), it must be justified per parent CLAUDE.md.
 
 ---
 
@@ -117,8 +117,8 @@ Every identifier that changes from the starter to this sample:
 | GitHub Actions workflow slug (if any) | `gpt-realtime-2-customer-support-voice-agent-ci` |
 | Image / container tag (if any) | `gpt-realtime-2-customer-support-voice-agent` |
 | UTM `utm_content=b2ai-oss-start` | `utm_content=b2ai-gpt-realtime-voice-agent` |
-| boto3 `user_agent_extra="vibe-coding-starter-kit/x.y.z"` | `user_agent_extra="gpt-realtime-2-customer-support-voice-agent/0.1.0"` |
-| `B2_KEY_ID` (env var) | `B2_APPLICATION_KEY_ID` (parent CLAUDE.md standard) |
+| boto3 `user_agent_extra="vibe-coding-starter-kit/x.y.z"` | `user_agent_extra="b2ai-gpt-realtime-2-customer-support-voice-agent (backblaze-b2-samples)"` |
+| key ID env var | `B2_APPLICATION_KEY_ID` (parent CLAUDE.md standard) |
 | `b2_key_id` (settings field) | `b2_application_key_id` |
 | README screenshots `b2-starterkit-*.png` | placeholders `voice-agent-*.png` (binary creation deferred per skill rules) |
 | Sidebar entry `Upload` | **kept** (ops upload) |
@@ -155,11 +155,13 @@ Every identifier that changes from the starter to this sample:
 
 ```
 # Backblaze B2 (required) — uses parent CLAUDE.md canonical names
-B2_ENDPOINT=https://s3.us-west-004.backblazeb2.com
 B2_APPLICATION_KEY_ID=
 B2_APPLICATION_KEY=
 B2_BUCKET_NAME=
-B2_REGION=us-west-004
+B2_REGION=
+B2_PUBLIC_URL_BASE=
+# Temporary migration fallback only:
+# B2_ENDPOINT=https://s3.<region>.backblazeb2.com
 
 # OpenAI (required)
 OPENAI_API_KEY=
