@@ -198,7 +198,11 @@ function checkEnv() {
       "Edit .env and replace placeholders with your real B2 credentials (https://secure.backblaze.com/app_keys.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-gpt-realtime-2-customer-support-voice-agent) and your OpenAI API key (https://platform.openai.com/api-keys)",
     );
   }
-  if (env[B2_REGION_VAR] && !B2_REGION_PATTERN.test(env[B2_REGION_VAR])) {
+  if (
+    env[B2_REGION_VAR] &&
+    !PLACEHOLDERS.has(env[B2_REGION_VAR]) &&
+    !B2_REGION_PATTERN.test(env[B2_REGION_VAR])
+  ) {
     fail(
       `${B2_REGION_VAR} must be a Backblaze region slug like <country>-<region>-<number>`,
       `Use the bucket region from the B2 dashboard, or temporarily keep ${LEGACY_B2_ENDPOINT_VAR} during migration`,
@@ -206,6 +210,7 @@ function checkEnv() {
   }
   if (
     env[LEGACY_B2_ENDPOINT_VAR] &&
+    !PLACEHOLDERS.has(env[LEGACY_B2_ENDPOINT_VAR]) &&
     !B2_ENDPOINT_PATTERN.test(env[LEGACY_B2_ENDPOINT_VAR])
   ) {
     fail(
@@ -213,7 +218,10 @@ function checkEnv() {
       `Prefer ${B2_REGION_VAR}; keep ${LEGACY_B2_ENDPOINT_VAR} only during a rolling migration`,
     );
   }
-  if (env[LEGACY_B2_ENDPOINT_VAR]) {
+  if (
+    env[LEGACY_B2_ENDPOINT_VAR] &&
+    !PLACEHOLDERS.has(env[LEGACY_B2_ENDPOINT_VAR])
+  ) {
     warn(
       `${LEGACY_B2_ENDPOINT_VAR} is deprecated`,
       `Set ${B2_REGION_VAR} and keep both values through one rollout before removing ${LEGACY_B2_ENDPOINT_VAR}`,

@@ -6,7 +6,11 @@ import pytest
 from pydantic import ValidationError
 
 import main as api_main
-from app.config.settings import Settings
+from app.config.settings import (
+    B2_ENDPOINT_PLACEHOLDER,
+    B2_REGION_PLACEHOLDER,
+    Settings,
+)
 from app.repo import b2_client
 
 VALID_B2_REGION = "aa-region-123"
@@ -50,6 +54,20 @@ def test_settings_derives_s3_endpoint_from_region():
 
     assert settings.b2_endpoint_url == VALID_B2_ENDPOINT
     assert settings.b2_effective_region == VALID_B2_REGION
+
+
+@pytest.mark.parametrize(
+    "b2_kwargs",
+    [
+        {"b2_region": B2_REGION_PLACEHOLDER},
+        {"b2_endpoint": B2_ENDPOINT_PLACEHOLDER},
+    ],
+)
+def test_settings_allows_b2_placeholders_for_startup_guidance(b2_kwargs):
+    settings = _valid_settings(**b2_kwargs)
+
+    assert settings.b2_endpoint_url == ""
+    assert settings.b2_effective_region == ""
 
 
 @pytest.mark.parametrize(
@@ -170,5 +188,21 @@ async def test_startup_requires_region_or_legacy_endpoint(monkeypatch):
     monkeypatch.setattr(api_main, "settings", _valid_settings())
 
     with pytest.raises(RuntimeError, match="B2_REGION"):
+        async with api_main.lifespan(None):
+            pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("b2_kwargs", "env_name"),
+    [
+        ({"b2_region": B2_REGION_PLACEHOLDER}, "B2_REGION"),
+        ({"b2_endpoint": B2_ENDPOINT_PLACEHOLDER}, "B2_ENDPOINT"),
+    ],
+)
+async def test_startup_reports_b2_placeholders(monkeypatch, b2_kwargs, env_name):
+    monkeypatch.setattr(api_main, "settings", _valid_settings(**b2_kwargs))
+
+    with pytest.raises(RuntimeError, match=env_name):
         async with api_main.lifespan(None):
             pass

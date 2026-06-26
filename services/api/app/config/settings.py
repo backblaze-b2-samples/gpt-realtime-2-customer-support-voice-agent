@@ -10,6 +10,8 @@ from pydantic_settings import BaseSettings
 # settings silently fall back to empty defaults and every external call
 # (OpenAI, B2) fails at runtime. A CWD-local `.env`, if present, still wins.
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+B2_REGION_PLACEHOLDER = "your-b2-region"
+B2_ENDPOINT_PLACEHOLDER = "your-b2-endpoint"
 B2_REGION_PATTERN = re.compile(r"^[a-z]{2}(?:-[a-z]+)+-[0-9]{3}$")
 B2_ENDPOINT_PATTERN = re.compile(
     r"^https://s3\.(?P<region>[a-z]{2}(?:-[a-z]+)+-[0-9]{3})"
@@ -64,6 +66,8 @@ class Settings(BaseSettings):
         value = value.strip()
         if not value:
             return ""
+        if value == B2_REGION_PLACEHOLDER:
+            return value
         if not B2_REGION_PATTERN.fullmatch(value):
             raise ValueError(
                 "B2_REGION must be a Backblaze region slug like "
@@ -75,8 +79,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_b2_endpoint(cls, value: str) -> str:
         value = value.strip().rstrip("/")
-        if not value:
-            return ""
+        if not value or value == B2_ENDPOINT_PLACEHOLDER:
+            return value
         if not B2_ENDPOINT_PATTERN.fullmatch(value):
             raise ValueError(
                 "B2_ENDPOINT must be a Backblaze S3 endpoint like "
@@ -86,20 +90,26 @@ class Settings(BaseSettings):
 
     @property
     def b2_endpoint_url(self) -> str:
-        if self.b2_region:
+        if self.b2_region and self.b2_region != B2_REGION_PLACEHOLDER:
             return f"https://s3.{self.b2_region}.backblazeb2.com"
-        return self.b2_endpoint
+        if self.b2_endpoint != B2_ENDPOINT_PLACEHOLDER:
+            return self.b2_endpoint
+        return ""
 
     @property
     def b2_effective_region(self) -> str:
-        if self.b2_region:
+        if self.b2_region and self.b2_region != B2_REGION_PLACEHOLDER:
             return self.b2_region
         match = B2_ENDPOINT_PATTERN.fullmatch(self.b2_endpoint)
         return match.group("region") if match else ""
 
     @property
     def uses_legacy_b2_endpoint(self) -> bool:
-        return bool(self.b2_endpoint and not self.b2_region)
+        return bool(
+            self.b2_endpoint
+            and self.b2_endpoint != B2_ENDPOINT_PLACEHOLDER
+            and not self.b2_region
+        )
 
     @property
     def cors_origins(self) -> list[str]:
