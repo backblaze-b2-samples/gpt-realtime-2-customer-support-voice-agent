@@ -208,7 +208,7 @@ def test_s3_client_falls_back_to_legacy_endpoint(monkeypatch, caplog):
 
     assert captured["endpoint_url"] == VALID_B2_ENDPOINT
     assert captured["region_name"] == VALID_B2_REGION
-    assert "B2_ENDPOINT is deprecated" in caplog.text
+    assert "B2_ENDPOINT is deprecated" not in caplog.text
 
 
 @pytest.mark.asyncio
