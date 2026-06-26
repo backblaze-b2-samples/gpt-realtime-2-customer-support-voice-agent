@@ -1,13 +1,16 @@
 """Tests for Backblaze B2 client configuration."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 import main as api_main
 from app.config.settings import (
+    B2_ENDPOINT_PATTERN,
     B2_ENDPOINT_PLACEHOLDER,
+    B2_REGION_PATTERN,
     B2_REGION_PLACEHOLDER,
     Settings,
 )
@@ -15,13 +18,18 @@ from app.repo import b2_client
 
 VALID_B2_REGION = "aa-region-123"
 VALID_B2_ENDPOINT = f"https://s3.{VALID_B2_REGION}.backblazeb2.com"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _clear_s3_client_cache() -> None:
+    b2_client.get_s3_client.cache_clear()
 
 
 @pytest.fixture(autouse=True)
 def reset_s3_client_cache():
-    b2_client.clear_s3_client_cache()
+    _clear_s3_client_cache()
     yield
-    b2_client.clear_s3_client_cache()
+    _clear_s3_client_cache()
 
 
 def _set_b2_settings(
@@ -40,13 +48,48 @@ def _set_b2_settings(
 
 
 def _valid_settings(**b2_kwargs) -> Settings:
-    return Settings(
-        b2_application_key_id="key-id",
-        b2_application_key="key",
-        b2_bucket_name="bucket",
-        openai_api_key="openai-key",
-        **b2_kwargs,
-    )
+    values = {
+        "b2_application_key_id": "key-id",
+        "b2_application_key": "key",
+        "b2_bucket_name": "bucket",
+        "b2_region": "",
+        "b2_endpoint": "",
+        "openai_api_key": "openai-key",
+    }
+    values.update(b2_kwargs)
+    return Settings(_env_file=None, **values)
+
+
+def test_b2_config_contract_stays_in_sync():
+    env_example = (REPO_ROOT / ".env.example").read_text()
+    doctor = (REPO_ROOT / "scripts/doctor.mjs").read_text()
+
+    required_b2_names = {
+        env_name for _attr, env_name in api_main.REQUIRED_B2_SETTINGS
+    }
+    endpoint_names = {
+        env_name for _attr, env_name in api_main.B2_ENDPOINT_SETTINGS
+    }
+
+    assert required_b2_names == {
+        "B2_APPLICATION_KEY_ID",
+        "B2_APPLICATION_KEY",
+        "B2_BUCKET_NAME",
+    }
+    assert endpoint_names == {"B2_REGION", "B2_ENDPOINT"}
+    assert "B2_PUBLIC_URL_BASE=" in env_example
+    for name in required_b2_names | endpoint_names:
+        assert name in env_example
+        assert name in doctor
+
+    for placeholder in (B2_REGION_PLACEHOLDER, B2_ENDPOINT_PLACEHOLDER):
+        assert placeholder in api_main.PLACEHOLDER_VALUES
+        assert placeholder in env_example
+        assert placeholder in doctor
+
+    assert B2_REGION_PATTERN.pattern in doctor
+    assert B2_ENDPOINT_PATTERN.fullmatch(VALID_B2_ENDPOINT)
+    assert "backblazeb2\\.com" in doctor
 
 
 def test_settings_derives_s3_endpoint_from_region():

@@ -59,10 +59,6 @@ def get_s3_client():
     )
 
 
-def clear_s3_client_cache() -> None:
-    get_s3_client.cache_clear()
-
-
 def check_connectivity() -> bool:
     try:
         client = get_s3_client()
